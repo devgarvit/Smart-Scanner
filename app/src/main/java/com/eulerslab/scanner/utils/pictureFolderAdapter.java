@@ -1,6 +1,9 @@
 package com.eulerslab.scanner.utils;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.net.Uri;
+import android.os.ParcelFileDescriptor;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -14,25 +17,27 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
 import com.eulerslab.scanner.R;
+import com.shockwave.pdfium.PdfDocument;
+import com.shockwave.pdfium.PdfiumCore;
 
+import java.io.File;
 import java.util.ArrayList;
 
 /**
  * Author CodeBoy722
- *
+ * <p>
  * An adapter for populating RecyclerView with items representing folders that contain images
  */
-public class pictureFolderAdapter extends RecyclerView.Adapter<pictureFolderAdapter.FolderHolder>{
+public class pictureFolderAdapter extends RecyclerView.Adapter<pictureFolderAdapter.FolderHolder> {
 
     private ArrayList<imageFolder> folders;
     private Context folderContx;
     private itemClickListener listenToClick;
 
     /**
-     *
-     * @param folders An ArrayList of String that represents paths to folders on the external storage that contain pictures
+     * @param folders     An ArrayList of String that represents paths to folders on the external storage that contain pictures
      * @param folderContx The Activity or fragment Context
-     * @param listen interFace for communication between adapter and fragment or activity
+     * @param listen      interFace for communication between adapter and fragment or activity
      */
     public pictureFolderAdapter(ArrayList<imageFolder> folders, Context folderContx, itemClickListener listen) {
         this.folders = folders;
@@ -53,18 +58,22 @@ public class pictureFolderAdapter extends RecyclerView.Adapter<pictureFolderAdap
     public void onBindViewHolder(@NonNull FolderHolder holder, int position) {
         final imageFolder folder = folders.get(position);
 
-        Glide.with(folderContx)
-                .load(folder.getFirstPic())
-                .apply(new RequestOptions().centerCrop())
-                .into(holder.folderPic);
+        if (folder.getFolderName().equalsIgnoreCase("PDF")) {
+            generateImageFromPdf(Uri.fromFile(new File(folder.getFirstPic())), holder);
+        } else
+            Glide.with(folderContx)
+                    .load(folder.getFirstPic())
+                    .apply(new RequestOptions().centerCrop())
+                    .into(holder.folderPic);
 
-        String text = "("+folder.getNumberOfPics()+") "+folder.getFolderName();
+
+        String text = "(" + folder.getNumberOfPics() + ") " + folder.getFolderName();
         holder.folderName.setText(text);
 
         holder.folderPic.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                listenToClick.onPicClicked(folder.getPath(),folder.getFolderName());
+                listenToClick.onPicClicked(folder.getPath(), folder.getFolderName());
             }
         });
 
@@ -76,16 +85,39 @@ public class pictureFolderAdapter extends RecyclerView.Adapter<pictureFolderAdap
     }
 
 
-    public class FolderHolder extends RecyclerView.ViewHolder{
-       ImageView folderPic;
-       TextView folderName;
-       CardView folderCard;
+    public class FolderHolder extends RecyclerView.ViewHolder {
+        ImageView folderPic;
+        TextView folderName;
+        CardView folderCard;
 
         public FolderHolder(@NonNull View itemView) {
             super(itemView);
-           folderPic = itemView.findViewById(R.id.folderPic);
-           folderName = itemView.findViewById(R.id.folderName);
-           folderCard = itemView.findViewById(R.id.folderCard);
+            folderPic = itemView.findViewById(R.id.folderPic);
+            folderName = itemView.findViewById(R.id.folderName);
+            folderCard = itemView.findViewById(R.id.folderCard);
+        }
+    }
+
+    void generateImageFromPdf(Uri pdfUri, FolderHolder holder) {
+        int pageNumber = 0;
+        PdfiumCore pdfiumCore = new PdfiumCore(folderContx);
+        try {
+            //http://www.programcreek.com/java-api-examples/index.php?api=android.os.ParcelFileDescriptor
+            ParcelFileDescriptor fd = folderContx.getContentResolver().openFileDescriptor(pdfUri, "r");
+            PdfDocument pdfDocument = pdfiumCore.newDocument(fd);
+            pdfiumCore.openPage(pdfDocument, pageNumber);
+            int width = pdfiumCore.getPageWidthPoint(pdfDocument, pageNumber);
+            int height = pdfiumCore.getPageHeightPoint(pdfDocument, pageNumber);
+            Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            pdfiumCore.renderPageBitmap(pdfDocument, bmp, pageNumber, 0, 0, width, height);
+            Glide.with(folderContx)
+                    .load(bmp)
+                    .apply(new RequestOptions().centerCrop())
+                    .into(holder.folderPic);
+            ;
+            pdfiumCore.closeDocument(pdfDocument); // important!
+        } catch (Exception e) {
+            //todo with exception
         }
     }
 

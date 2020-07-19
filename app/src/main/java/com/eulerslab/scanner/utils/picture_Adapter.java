@@ -1,6 +1,9 @@
 package com.eulerslab.scanner.utils;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.net.Uri;
+import android.os.ParcelFileDescriptor;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -11,7 +14,10 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
 import com.eulerslab.scanner.R;
+import com.shockwave.pdfium.PdfDocument;
+import com.shockwave.pdfium.PdfiumCore;
 
+import java.io.File;
 import java.util.ArrayList;
 
 import static androidx.core.view.ViewCompat.setTransitionName;
@@ -53,6 +59,9 @@ public class picture_Adapter extends RecyclerView.Adapter<PicHolder> {
 
         final pictureFacer image = pictureList.get(position);
 
+        if (image.getPicturePath().contains("PDF")) {
+            generateImageFromPdf(Uri.fromFile(new File(image.getPicturePath())), holder);
+        } else
         Glide.with(pictureContx)
                 .load(image.getPicturePath())
                 .apply(new RequestOptions().centerCrop())
@@ -67,6 +76,29 @@ public class picture_Adapter extends RecyclerView.Adapter<PicHolder> {
             }
         });
 
+    }
+
+    void generateImageFromPdf(Uri pdfUri, PicHolder holder) {
+        int pageNumber = 0;
+        PdfiumCore pdfiumCore = new PdfiumCore(pictureContx);
+        try {
+            //http://www.programcreek.com/java-api-examples/index.php?api=android.os.ParcelFileDescriptor
+            ParcelFileDescriptor fd = pictureContx.getContentResolver().openFileDescriptor(pdfUri, "r");
+            PdfDocument pdfDocument = pdfiumCore.newDocument(fd);
+            pdfiumCore.openPage(pdfDocument, pageNumber);
+            int width = pdfiumCore.getPageWidthPoint(pdfDocument, pageNumber);
+            int height = pdfiumCore.getPageHeightPoint(pdfDocument, pageNumber);
+            Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            pdfiumCore.renderPageBitmap(pdfDocument, bmp, pageNumber, 0, 0, width, height);
+            Glide.with(pictureContx)
+                    .load(bmp)
+                    .apply(new RequestOptions().centerCrop())
+                    .into(holder.picture);
+            ;
+            pdfiumCore.closeDocument(pdfDocument); // important!
+        } catch (Exception e) {
+            //todo with exception
+        }
     }
 
     @Override

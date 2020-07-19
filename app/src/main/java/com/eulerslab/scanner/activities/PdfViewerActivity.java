@@ -19,7 +19,7 @@ import java.io.IOException;
 import java.io.InputStream;
 
 public class PdfViewerActivity extends AppCompatActivity {
-    private static final String FILENAME = "policy.pdf";
+    private String FILENAME;
     private ParcelFileDescriptor mFileDescriptor;
     private PdfRenderer mPdfRenderer;
     RecyclerView recyclerView;
@@ -32,7 +32,8 @@ public class PdfViewerActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_pdf_viewer);
-        // initialisation with id's
+        FILENAME = getIntent().getStringExtra("fileName");
+
         try {
             openRenderer(getApplicationContext());
         } catch (IOException e) {
